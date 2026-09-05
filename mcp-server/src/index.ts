@@ -5,31 +5,15 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import axios from "axios";
-
-// Configurações e Variáveis de Ambiente
-// Forçando para /v1 para evitar qualquer cache de variável de ambiente com /api/v1
-const API_URL = process.env.ERP_API_URL || "https://goobras-api.fglabs.com.br/v1";
-// Tenta pegar o token exclusivamente da variável de ambiente para evitar exposição de CLI
-const TOKEN = process.env.ERP_TOKEN;
-
-if (!TOKEN) {
-  console.error("Erro: Token não fornecido. Defina a variável de ambiente ERP_TOKEN.");
-  process.exit(1);
-}
-
-// Cliente HTTP Axios pré-configurado
-const api = axios.create({ baseURL: API_URL });
-api.interceptors.request.use((config) => {
-  config.headers.Authorization = `Bearer ${TOKEN}`;
-  return config;
-});
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+import { api } from "./infrastructure/http/erp-client.js";
+import { registry } from "./server/tool-registry.js";
+import "./modules/clients/index.js";
+import "./modules/suppliers/index.js";
+import "./modules/projects/index.js";
+import "./modules/materials/index.js";
+import "./modules/templates/index.js";
+import "./modules/globals/index.js";
+import "./modules/invoices/index.js";
 
 // Setup do Servidor MCP
 const server = new Server(
@@ -47,134 +31,7 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
-      {
-        name: "listar_clientes",
-        description: "Lista clientes cadastrados no ERP",
-        inputSchema: {
-          type: "object",
-          properties: {
-            q: { type: "string", description: "Termo de busca" },
-            page: { type: "number", description: "Número da página" },
-            limit: { type: "number", description: "Quantidade por página" },
-          },
-        },
-      },
-      {
-        name: "obter_cliente",
-        description: "Obtém detalhes de um cliente específico pelo ID",
-        inputSchema: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-          },
-          required: ["id"],
-        },
-      },
-      {
-        name: "criar_cliente",
-        description: "Cria um novo cliente",
-        inputSchema: {
-          type: "object",
-          properties: {
-            nome: { type: "string" },
-            tipo: { type: "string", enum: ["fisica", "juridica"] },
-            cnpj: { type: "string" },
-            cpf: { type: "string" },
-            email: { type: "string" },
-            telefone: { type: "string" },
-            logradouro: { type: "string" },
-            numero: { type: "string" },
-            cidade: { type: "string" },
-            estado: { type: "string" },
-            cep: { type: "string" },
-            ativo: { type: "boolean" },
-          },
-          required: ["nome", "tipo", "email", "telefone", "cidade", "estado", "ativo"],
-        },
-      },
-      {
-        name: "alternar_status_cliente",
-        description: "Ativa ou desativa um cliente",
-        inputSchema: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-          },
-          required: ["id"],
-        },
-      },
-      {
-        name: "listar_fornecedores",
-        description: "Lista fornecedores cadastrados no ERP",
-        inputSchema: {
-          type: "object",
-          properties: {
-            search: { type: "string", description: "Termo de busca" },
-            skip: { type: "number", description: "Offset da busca" },
-            limit: { type: "number", description: "Quantidade por página" },
-          },
-        },
-      },
-      {
-        name: "criar_fornecedor",
-        description: "Cria um novo fornecedor",
-        inputSchema: {
-          type: "object",
-          properties: {
-            razao_social: { type: "string" },
-            nome_fantasia: { type: "string" },
-            cnpj: { type: "string" },
-            cpf: { type: "string" },
-            email: { type: "string" },
-            telefone: { type: "string" },
-            ativo: { type: "boolean" },
-          },
-          required: ["razao_social", "ativo"],
-        },
-      },
-      {
-        name: "listar_projetos",
-        description: "Lista os projetos disponíveis no ERP",
-        inputSchema: {
-          type: "object",
-          properties: {
-            q: { type: "string", description: "Termo de busca" },
-          },
-        },
-      },
-      {
-        name: "listar_projeto_etapas",
-        description: "Lista as etapas de um projeto específico",
-        inputSchema: {
-          type: "object",
-          properties: {
-            projetoId: { type: "string" },
-          },
-          required: ["projetoId"],
-        },
-      },
-      {
-        name: "listar_projeto_tarefas",
-        description: "Lista as tarefas de uma etapa ou projeto",
-        inputSchema: {
-          type: "object",
-          properties: {
-            projetoId: { type: "string" },
-            etapaId: { type: "string" },
-            q: { type: "string", description: "Termo de busca" },
-          },
-        },
-      },
-      {
-        name: "listar_materiais",
-        description: "Lista o catálogo global de materiais",
-        inputSchema: {
-          type: "object",
-          properties: {
-            q: { type: "string", description: "Termo de busca" },
-          },
-        },
-      },
+      ...registry.getToolList(),
       {
         name: "listar_materiais_tarefa",
         description: "Lista os materiais vinculados a uma tarefa específica",
@@ -604,46 +461,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (name) {
-      case "listar_clientes": {
-        const res = await api.get("/clientes", { params: args });
-        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
-      }
-      case "obter_cliente": {
-        const res = await api.get(`/clientes/${args?.id}`);
-        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
-      }
-      case "criar_cliente": {
-        const res = await api.post("/clientes", args);
-        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
-      }
-      case "alternar_status_cliente": {
-        const res = await api.patch(`/clientes/${args?.id}/toggle-ativo`);
-        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
-      }
-      case "listar_fornecedores": {
-        const res = await api.get("/fornecedores", { params: args });
-        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
-      }
-      case "criar_fornecedor": {
-        const res = await api.post("/fornecedores", args);
-        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
-      }
-      case "listar_projetos": {
-        const res = await api.get("/projetos", { params: args });
-        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
-      }
-      case "listar_projeto_etapas": {
-        const res = await api.get("/projeto-etapas", { params: args });
-        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
-      }
-      case "listar_projeto_tarefas": {
-        const res = await api.get("/projeto-tarefas", { params: args });
-        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
-      }
-      case "listar_materiais": {
-        const res = await api.get("/materiais", { params: args });
-        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
-      }
       case "listar_materiais_tarefa": {
         const { tarefaId, ...rest } = args as any;
         const res = await api.get(`/projeto-tarefas/${tarefaId}/materiais`, { params: rest });
@@ -795,7 +612,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
       }
       default:
-        throw new Error(`Tool unknown: ${name}`);
+        try {
+          return await registry.executeTool(name, args);
+        } catch (err: any) {
+          if (err.message.startsWith("Tool unknown")) {
+             throw new Error(`Tool unknown: ${name}`);
+          }
+          throw err;
+        }
     }
   } catch (error: any) {
     const errorMsg = error.response?.data ? JSON.stringify(error.response.data) : error.message;
