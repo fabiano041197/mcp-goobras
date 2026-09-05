@@ -52,11 +52,11 @@ async function main() {
     console.log("INSTRUÇÕES PARA O CURSOR / OUTROS CLIENTES");
     console.log("=========================================");
     console.log("A maioria das extensões do VS Code ou configurações no Cursor (como Settings > Features > MCP) precisam ser cadastradas manualmente pela interface.\n");
-    console.log("Copie e cole as informações abaixo no painel de Adicionar Servidor MCP:");
+    console.log("\nCopie e cole as informações abaixo no painel de Adicionar Servidor MCP:");
     console.log(`\nNome: mcp-goobras`);
     console.log(`Tipo: command`);
-    console.log(`Comando: npx`);
-    console.log(`Argumentos: -y mcp-goobras`);
+    console.log(`Comando: node`);
+    console.log(`Argumentos: ${path.join(process.cwd(), "dist", "index.js")}`);
     console.log(`\nVariáveis de Ambiente (Env):`);
     console.log(`ERP_TOKEN = ${token}`);
     console.log(`ERP_API_URL = ${apiUrl}`);
